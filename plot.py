@@ -28,17 +28,23 @@ class PlotForm(QMainWindow):
             self.statusBar().showMessage("Saved to %s" % path, 2000)
 
     def on_pick(self, event):
-        line_points = event.artist.get_bbox().get_points()
-        msg = "You've selected: \n %s" % line_points
-        QMessageBox.information(self, "Click!", msg)
+        if isinstance(event.artist ,Line2D):
+            thisline = event.artist
+            msg = "You've selected: \n %s" % line_points
+            QMessageBox.information(self, "Click!", msg)
+	    print "Pick event called, line 2D"
 
     def draw_plot(self):
         self.figure.clf()
         self.ax = self.figure.add_subplot(111)
+        self.canvas.mpl_connect('pick_event', self.on_pick)
         self.ax.grid(self.grid_cb.isChecked())
-        lines = self.ax.plot(*self.final)
+	lines = []
+	for entry in self.final:
+            line, = self.ax.plot(*entry, picker=True)
+            lines.append(line)
         self.ax.hold(False)
-	self.ax.set_title("Enery Data")
+	self.ax.set_title("Energy Data")
         self.ax.set_xlabel("Time (minutes)")
         self.ax.set_ylabel("Power (w)")
         self.ax2 = self.ax.twinx()
@@ -59,17 +65,21 @@ class PlotForm(QMainWindow):
         self.figure = plt.figure(dpi=self.dpi)
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setParent(self.main_frame)
-        self.toolbar = NavigationToolbar(self.canvas, self.main_frame)
+       	self.toolbar = NavigationToolbar(self.canvas, self.main_frame)
 
         self.add_log_button = QPushButton("&Add Log")
         self.add_log_button.setFixedWidth(150)
-        self.add_log_button.clicked.connect(self.addLog)
+        self.add_log_button.clicked.connect(self.add_log)
+        self.clear_plot_button = QPushButton("&Clear Plot")
+        self.clear_plot_button.setFixedWidth(150)
+        self.clear_plot_button.clicked.connect(self.clear_plot)
         self.grid_cb = QCheckBox("Show &Grid")
         self.grid_cb.setChecked(False)
         self.connect(self.grid_cb, SIGNAL('stateChanged(int)'), self.draw_plot)
 
         hbox = QHBoxLayout()
         hbox.addWidget(self.add_log_button)
+        hbox.addWidget(self.clear_plot_button)
         hbox.addWidget(self.grid_cb)
 
         vbox = QVBoxLayout()
@@ -80,7 +90,7 @@ class PlotForm(QMainWindow):
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
-    def addLog(self):
+    def add_log(self):
         files = QFileDialog.getOpenFileNames(self.main_frame,
             "Select one or more files to open",)
         if files:
@@ -97,10 +107,16 @@ class PlotForm(QMainWindow):
                 for row in item:
                     t.append((row[0] / 60))
                     w.append(row[1])
-                self.final.append(t)
-                self.final.append(w)
+                self.final.append([t, w])
             self.draw_plot()
         self.statusBar().showMessage("Added new logs to subplot")
+
+    def clear_plot(self):
+        if self.final:
+            self.final = []
+            self.figure.delaxes(self.ax)
+            self.figure.delaxes(self.ax2)
+            self.canvas.draw()
 
     def create_menu(self):
         self.file_menu = self.menuBar().addMenu("&File")
@@ -108,7 +124,7 @@ class PlotForm(QMainWindow):
 	    shortcut="Ctrl+S", slot=self.save_plot,
             tip="Save the plot")
         open_file_action = self.create_action("&Add log",
-            shortcut="Ctrl+O", slot=self.addLog,
+            shortcut="Ctrl+O", slot=self.add_log,
             tip="Add log to subplot")
         quit_action = self.create_action("&Quit", 
             shortcut="Ctrl+Q", tip="Close the app")
