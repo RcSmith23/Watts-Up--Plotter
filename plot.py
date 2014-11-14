@@ -114,6 +114,7 @@ class PlotForm(QMainWindow):
     def clear_plot(self):
         if self.final:
             self.final = []
+            self.names = []
             self.figure.delaxes(self.ax)
             self.figure.delaxes(self.ax2)
             self.canvas.draw()
